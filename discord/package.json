@@ -1,0 +1,16 @@
+{
+  "name": "harvest",
+  "version": "1.0.0",
+  "description": "Discord Bot to fetch torrents",
+  "main": "index.js",
+  "repository": "https://github.com/WWPOL/Harvest",
+  "author": "Rudhra Raveendran",
+  "license": "MIT",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^12.4.1",
+    "dotenv": "^8.2.0"
+  }
+}
