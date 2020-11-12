@@ -7,10 +7,14 @@
   "author": "Rudhra Raveendran",
   "license": "MIT",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "format": "prettier --write \"**/*.{js,jsx,json,md}\""
   },
   "dependencies": {
     "discord.js": "^12.4.1",
     "dotenv": "^8.2.0"
+  },
+  "devDependencies": {
+    "prettier": "^2.1.2"
   }
 }
