@@ -1,87 +1,177 @@
 import express from "express";
+import EnvConfig from "./envconfig";
+
+type APIRoute = [string, string, APIHandler];
+
+type APIHandler =  (req: express.Request, res: express.Response) => Promise<any>;
 
 /**
- * Like Array.map but for objects.
- * @param obj To process.
- * @param callback Called on each top level key of the object, expected to return a new
- *     value for that key.
- * @returns Object with same top level keys but values returned by callback.
+ * Class which provides the HTTP API implementation. The reason it's a class is to make 
+ * it easier to test later.
+ *
+ * To use:
+ * ```ts
+ * const api = new HTTPAPI();
+ * await api.run(): // Run the HTTP server, closes cleanly on SIGINT (C-c).
+ * ```
  */
-function objMap(obj: {[index: string]: any}, callback: ((key: string, value: any) => any)): {[index: string]: any} {
-    let res: {[index: string]: any} = {};
-    Object.keys(obj).forEach((k: string) => {
-        res[k] = callback(k, obj[k]);
-    });
-    return res;
-}
+export default class HTTPAPI {
+    /**
+     * Properly configured Express server.
+     */
+    app: express.Express;
 
+    /**
+     * HTTP API routes.
+     */
+    routes: APIRoute[];
+    
+    /**
+     * Initialize an HTTP API, does not run anything.
+     */
+    constructor() {
+        this.app = express();
 
-/**
- * Creates a configuration object from environment variables.
- * @param prefix Prefix to prepend to every environment variable name in the def argument.
- * @param def Definition of configuration, keys names of corresponding keys in the
- *     resulting object and values are tuples in the 
- *     form [envKey: string, type: string, default: any?].
- * @throws {string} If an error occurrs parsing the configuration.
- */
-function EnvConfig(prefix: string, def: object) {
-    let missingEnvs = new Set();
+        this.app.use(this.loggerHandler);
 
-    function resolve(def: object): object {
-        return objMap(def, (k: string, v: any): any => {
-            // If we need to call recursively
-            if (Array.isArray(v) === false) {
-                return resolve(v);
+        this.routes = [
+            ["get", "/api/v0/health", this.getHealth],
+            ["get", "/api/v0/resource/:uri", this.getResource],
+        ];
+        this.routes.forEach((route) => {
+            console.log(`Registered [${route[0]}, ${route[1]}]`);
+            let routeFn = null;
+            if (route[0] === "get") {
+                routeFn = this.app.get;
+            } else if (route[0] === "post") {
+                routeFn = this.app.post;
+            } else if (route[0] === "put") {
+                routeFn = this.app.put;
+            } else if (route[0] === "delete") {
+                routeFn = this.app.delete;
+            } else if (route[0] === "options") {
+                routeFn = this.app.options;
             }
 
-            // Otherwise process as tuple definition
-            const envKey = prefix + v[0];
-            const envType = v[1];
-            
-            let envValue: any = process.env[envKey];
-            if (envValue === undefined) {
-                // Use defined default value
-                if (v.length === 3) {
-                    envValue = v[2];
-                } else {
-                    // If no default value record as missing
-                    missingEnvs.add(envKey);
-                    return undefined;
-                }
+            if (routeFn === null) {
+                throw `Invalid route, invalid request type for: ${route}`;
             }
 
-            try {
-                switch (envType) {
-                    case "string":
-                        envValue = envValue.toString();
-                        break;
-                    case "integer":
-                        envValue = parseInt(envValue);
-                        break;
-                    default:
-                        throw `Unknown type in definition, the type "${envType}" is not valid`;
-                }
-            } catch (e) {
-                throw `Failed to cast configuration key "${k}" (Environment variable "${envKey}"): ${e}`;
-            }
+            routeFn(route[1], (req: express.Request, res: express.Response) => {
+                Promise.all([route[2](req, res)]).catch((e: any) => {
+                    throw e;
+                });
+            });
+        });
 
-            return envValue;
+        this.app.use(this.defaultHandler); // Should be after all defined routes
+        this.app.use(this.errorHandler); // Last
+    }
+
+    /**
+     * Run the HTTP API and gracefully stop blocking the process via SIGINT.  
+     * @returns Promise which resolves null when exiting or rejects with a string error. 
+     */
+    async run(): Promise<string | null> {
+        // Get configuration
+        const cfg = EnvConfig("APP_", {
+            http: {
+                port: ["HTTP_PORT", "string"],
+            },
+        });
+
+        /*
+        // Mongo DB
+        const dbConn = await mongodb.MongoClient.connect(cfg.mongodb.uri, {
+	    useUnifiedTopology: true
+        });
+        const dbClient = await dbConn.db(cfg.mongodb.dbName);
+
+        const db = {
+	    users: await dbClient.collection("users"),
+	    playlists: await dbClient.collection("playlists"),
+	    tracks: await dbClient.collection("tracks"),
+        };
+
+        console.log("Connected to MongoDB");
+        */
+
+        // Execute server
+        return new Promise((resolve, reject) => {
+	        const server = this.app.listen(cfg.http.port, () => {
+		        console.log(`HTTP API listening on :${cfg.http.port}`);
+	        });
+
+	        process.on("SIGINT", async () => {
+		        console.log("Shutting down");
+		        server.close();
+		        // await dbConn.close();
+	        });
+	        
+	        server.on("error", (e) => {
+		        reject(e.toString());
+	        });
+
+	        server.on("close", () => {
+		        resolve(null);
+	        });
         });
     }
 
-    let config = resolve(def);
-
-    if (missingEnvs.size > 0) {
-        throw `Missing environment variable(s): ${Array.from(missingEnvs).join(", ")}`;
+    /**
+     * Handles any requests that don't have a handler.
+     * Request: ANY
+     * Response: 404 `{ error: "not found" }`
+     */
+    async defaultHandler(req: express.Request, res: express.Response, next: express.NextFunction) {
+        return res.status(404).send({
+            "error": "not found",
+        });
+    }
+    
+    /**
+     * Handles any errors in other handlers.
+     * Response: `{ error: "internal server error" }`
+     */
+    async errorHandler(error: any, req: express.Request, res: express.Response, next: express.NextFunction) {
+        console.trace(`${req.method} ${req.path}`, error);
+        
+        return res.send({
+            error: "internal server error",
+        });
     }
 
-    return config;
+    /**
+     * Middleware which logs a request and calls the next handler.
+     */
+    loggerHandler(req: express.Request, res: express.Response, next: express.NextFunction) {
+        console.log(`${new Date().toISOString()} REQ ${req.method} ${req.path}`);
+
+        next();
+
+        console.log(`${new Date().toISOString()} RES ${req.method} ${req.path} ${res.statusCode}`);
+    }
+
+    /**
+     * Get API health. Simple liveness check.
+     * Request: GET
+     * Response: `{ ok: true }`
+     */
+    async getHealth(req: express.Request, res: express.Response): Promise<any> {
+        return res.send({
+            ok: true,
+        });
+    }
+
+    /**
+     * Get resource. If downloaded returns status, if not downloaded starts download,
+     * if currently downloading returns status.
+     * Request: GET
+     * URL Parameters:
+     *     <uri> The resource's URI. Must be a supported schema.
+     * Response: { "resource": Resource }
+     */
+    async getResource(req: express.Request, res: express.Response): Promise<any> {
+        throw "Not implemented";
+    }
 }
-
-const cfg = EnvConfig("APP_", {
-    http: {
-        port: ["HTTP_PORT", "string", 8000],
-    },
-})
-
-console.log(cfg);
