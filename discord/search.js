@@ -1,6 +1,9 @@
 const crypto = require("crypto");
 
-// import a search module or write one yourself
+/**
+ * Searches for a torrent and returns array of objects with the
+ * keys: { name: string, size: int, seeders: int, url: string }.
+*/
 const searchModule = (query) =>
   new Promise((resolve) => {
     const separators = [" ", ".", "-", "_"];

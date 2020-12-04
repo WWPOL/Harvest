@@ -1,7 +1,35 @@
 require("dotenv").config();
 const Discord = require("discord.js");
+const search = require("./search");
+
+const EnvConfig = require("./envconfig");
+
+// Load application configuration
+const cfg = EnvConfig("HARVEST_", {
+  discord: {
+    token: [ "DISCORD_TOKEN", "string" ],
+  },
+  torrent: {
+    transmission: {
+      host: [ "TRANSMISSION_HOST", "string" , "127.0.0.1" ],
+      port: [ "TRANSMISSION_PORT", "integer", 9091 ],
+      username: [ "TRANSMISSION_USERNAME", "string", "" ],
+      password: [ "TRANSMISSION_PASSWORD", "string", "" ],
+      ssl: [ "TRANSMISSION_SSL", "boolean", false ],
+      url: [ "TRANSMISSION_URL", "string", "/transmission/rpc" ],
+    },
+    downloadDir: {
+      path: [ "DOWNLOAD_DIR_PATH", "string", "./dev-resource-dl" ],
+      maxBytes: [ "DOWNLOAD_DIR_MAX_BYTES", "integer", 5,368,706,371 ], // 5 Giga*Bytes*
+    },
+    mongo: {
+      uri: [ "MONGO_URI", "string", "mongodb://127.0.0.1" ],
+      dbName: [ "MONGO_DB_NAME", "string", "dev-harvest" ],
+    },
+  },
+});
+
 const client = new Discord.Client();
-const search = require(`./plugins/${process.env.SEARCH_PLUGIN}`);
 
 client.on("ready", async () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -86,6 +114,8 @@ client.on("messageReactionAdd", async (reaction, user) => {
       msg.reply(
         `Going to download:\n\`\`\`${JSON.stringify(results[i], null, 2)}\`\`\``
       );
+
+      
     }
   }
 });
