@@ -39,6 +39,7 @@ configuration variables can be left blank for development.
 
 **Discord**:  
 
+- `HARVEST_DISCORD_CHANNEL` (string)
 - `HARVEST_DISCORD_TOKEN` (string)
 
 **Transmission RPC**:  
@@ -58,3 +59,10 @@ configuration variables can be left blank for development.
 
 - `HARVEST_MONGO_URI` (string, default `mongodb://127.0.0.1`)
 - `HARVEST_MONGO_DB_NAME` (string, default `dev-harvest`)
+
+## Discord Bot
+Invite it to your server with:
+
+```
+https://discord.com/oauth2/authorize?client_id=<client id>&scope=bot&permissions=85056
+```

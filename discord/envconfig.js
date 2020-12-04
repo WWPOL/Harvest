@@ -34,7 +34,7 @@ function EnvConfig(prefix, def) {
   let missingEnvs = new Set();
 
   function resolve(def) {
-    return objMap(def, (k, v) {
+    return objMap(def, (k, v) => {
       // If we need to call recursively
       if (Array.isArray(v) === false) {
         return resolve(v);
