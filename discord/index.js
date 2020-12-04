@@ -29,10 +29,10 @@ const cfg = EnvConfig("HARVEST_", {
   },
 });
 
-const client = new Discord.Client();
+const discord = new Discord.Client();
 
-client.on("ready", async () => {
-  console.log(`Logged in as ${client.user.tag}!`);
+discord.on("ready", async () => {
+  console.log(`Logged in as ${discord.user.tag}!`);
 });
 
 const HELP_STRING = `Harvest accepts the following commands:
@@ -61,7 +61,7 @@ const asyncForEach = async (array, callback) => {
 };
 
 const listMessages = {};
-client.on("message", async (msg) => {
+discord.on("message", async (msg) => {
   // if channel id is set, only process if in proper channel, otherwise process regardless
   if (
     (process.env.CHANNEL_ID && msg.channel.id === process.env.CHANNEL_ID) ||
@@ -104,7 +104,7 @@ client.on("message", async (msg) => {
   }
 });
 
-client.on("messageReactionAdd", async (reaction, user) => {
+discord.on("messageReactionAdd", async (reaction, user) => {
   if (listMessages.hasOwnProperty(user.id)) {
     const { msgId, listMsgId, results } = listMessages[user.id];
     if (reaction.message.id === listMsgId) {
@@ -120,4 +120,4 @@ client.on("messageReactionAdd", async (reaction, user) => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+discord.login(process.env.DISCORD_TOKEN);
