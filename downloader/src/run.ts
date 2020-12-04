@@ -1,5 +1,7 @@
 import HTTPAPI from "./index";
 
+console.log("Process started");
+
 process.on("unhandledRejection", (error: any) => {
     console.error(`${new Date().toISOString()} ERR Unhandled promise rejection`);
     console.trace(error);

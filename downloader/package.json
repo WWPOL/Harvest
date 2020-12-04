@@ -1,24 +1,28 @@
 {
-   "name": "downloader",
-   "version": "0.1.0",
-   "description": "Harvest downloader service.",
-   "main": "index.ts",
-   "repository": "git@github.com/WWPOL/Harvest.git",
-   "author": "WWPOL",
-   "license": "MIT",
-   "private": true,
-   "scripts": {
-      "start": "node --trace-warnings lib/run.js",
-       "build": "tsc -p .",
-       "buildstart": "yarn build && yarn start",
-      "dev": "nodemon -V --watch 'src/' --exec yarn buildstart"
-   },
-   "dependencies": {
-      "@types/express": "^4.17.9",
-      "@types/node": "^14.14.10",
-      "express": "^4.17.1",
-      "nodemon": "^2.0.6",
-      "ts-node": "^9.0.0",
-      "typescript": "^4.1.2"
-   }
+    "name": "downloader",
+    "version": "0.1.0",
+    "description": "Harvest downloader service.",
+    "main": "lib/index.ts",
+    "repository": "git@github.com/WWPOL/Harvest.git",
+    "author": "WWPOL",
+    "license": "MIT",
+    "private": true,
+    "scripts": {
+        "start": "node --trace-warnings lib/run.js",
+        "startwatch": "nodemon -V --watch 'lib/' --exec yarn start",
+        "build": "tsc -p .",
+        "buildstart": "yarn build && yarn start",
+        "buildwatch": "tsc --watch -p .",
+        "dev": "(yarn buildwatch & yarn startwatch)"
+    },
+    "dependencies": {
+        "@types/express": "^4.17.9",
+        "@types/node": "^14.14.10",
+        "express": "^4.17.1",
+        "nodemon": "^2.0.6",
+        "source-map-support": "^0.5.19",
+        "transmission": "^0.4.10",
+        "ts-node": "^9.0.0",
+        "typescript": "^4.1.2"
+    }
 }

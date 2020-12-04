@@ -15,6 +15,12 @@ Install dependencies:
 yarn install
 ```
 
+Run the Transmission Torrent Daemon:
+
+```
+./transmission-daemon
+```
+
 Start automatically reloading server:
 
 ```
