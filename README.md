@@ -64,5 +64,8 @@ configuration variables can be left blank for development.
 Invite it to your server with:
 
 ```
-https://discord.com/oauth2/authorize?client_id=<client id>&scope=bot&permissions=85056
+https://discord.com/oauth2/authorize?client_id=<client id>&scope=bot&permissions=3271232
 ```
+
+## Color Schema
+Main color: #d754e4.
