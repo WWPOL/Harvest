@@ -6,6 +6,11 @@
 #           "not found" if the Transmission container does not exist.
 prog_dir=$(dirname $(realpath "$0"))
 
+function die() {
+    echo "transmission: $@" >&2
+    exit 1
+}
+
 if [ -z "$CONTAINER_CLI" ]; then
     CONTAINER_CLI="sudo podman"
 fi
@@ -16,10 +21,7 @@ container_tag="linuxserver/transmission:latest"
 host_dl_dir="$prog_dir/container-data/download"
 guest_dl_dir="/download"
 
-function die() {
-    echo "transmission: $@" >&2
-    exit 1
-}
+mkdir -p "$host_dl_dir"
 
 case "$1" in
     start)

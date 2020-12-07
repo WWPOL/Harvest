@@ -7,7 +7,7 @@
   "author": "Rudhra Raveendran",
   "license": "MIT",
   "scripts": {
-    "start": "node index.js",
+    "start": "node --unhandled-rejections=strict index.js",
     "format": "prettier --write \"**/*.{js,jsx,json,md}\""
   },
   "dependencies": {

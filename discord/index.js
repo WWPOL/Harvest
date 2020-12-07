@@ -67,50 +67,143 @@ class ResourceFetcher {
     });
   }
 
-  await updateStatusMsg(requestId) {
+  runStatusUpdater() {
+    (async function() {
+      const requests = await this.db.requests.find({
+        "torrent.status.inProgress": true,
+      }).toArray();
+
+      await Promise.all(requests.map(async (request) => {
+        await this.updateStatusMsg(request._id);
+      }));
+
+      setTimeout(() => {
+        this.runStatusUpdater();
+      }, 1000);
+    }).bind(this)();
+  }
+
+  async updateStatusMsg(requestId) {
     // Get request
     const request = await this.db.requests.findOne({
       _id: requestId,
     });
 
-    if (request === null || request.discord.statusMsgId === undefined) {
+    if (request === null || request.discord.statusMsgId === undefined || request.discord.statusMsgId === null) {
       return;
     }
 
     // Get status msg
-    const msg = await this.discord.messages.fetch(reaction.message.id);
-  }
+    const channel = await this.discord.channels.fetch(request.discord.channelId);
+    const msg = await channel.messages.fetch(request.discord.statusMsgId);
 
-  async download(requestId, uri) {
-    const handle = await this._promisify((cb) => {
-      this.transmission.addUrl(uri, cb);
-    });
+    // Get torrent information
+    let transmissionId = undefined;
+    if (request.torrent === undefined || request.torrent.transmissionId === undefined) {
+      const handle = await this._promisify((cb) => {
+        this.transmission.addUrl(request.choice.magnetLink, cb);
+      });
+
+      transmissionId = handle.id;
+    } else {
+      transmissionId = request.torrent.transmissionId;
+    }
 
     const status = (await this._promisify((cb) => {
-      this.transmission.get(handle.id, cb);
-    }))[0];
+      this.transmission.get(transmissionId, cb);
+    })).torrents[0];
 
+    // Save torrent status info in db
+    let torrStatus = ":thinking: Verifying...";
+
+    if (status === undefined) {
+      console.warn(`Can't find torrent in Transmission with id ${transmissionId})`);
+      return;
+    }
+    
+    switch (status.status) {
+    case 3:
+      torrStatus = "Queued";
+      break
+    case 4:
+      torrStatus = "Downloading";
+      break;
+    case 6:
+      torrStatus = "Seeding";
+      break;
+    }
+    
+    const dbTorr = {
+      transmissionId: transmissionId,
+      name: status.name,
+      hashString: status.hashString,
+      status: {
+        inProgress: torrStatus !== "Seeding",
+        status: torrStatus,
+        progress: status.percentDone,
+        downloadRate: status.rateDownload,
+        numPeers: status.peersSendingToUs,
+        eta: status.eta,
+      },
+    };
+    
     await this.db.requests.updateOne({
       _id: requestId,
     }, {
       $set: {
-        torrent: {
-          transmissionId: handle.id,
-          name: handle.name,
-          hashString: handle.hashString,
-          status: {
-            flags: {
-              downloading: true,
-              done: status.doneDate !== 0,
-            },
-            progress: status.percentDone,
-            downloadRate: status.rateDownload
-            numPeers: status.peersSendingToUs,
-            eta: status.eta,
-          },
-        },
+        torrent: dbTorr,
       }
     });
+
+    // Update discord status message
+    const msgFields = [
+      {
+        name: "Status",
+        value: dbTorr.status.status,
+      },
+    ];
+
+    if (dbTorr.status.status === "Downloading") {
+      msgFields.push({
+        name: "Progress",
+        value: `${dbTorr.status.progress * 100}%`,
+      });
+      
+      msgFields.push({
+        name: "Download Rate",
+        value: dbTorr.status.downloadRate,
+      });
+
+      msgFields.push({
+        name: "# Peers",
+        value: dbTorr.status.numPeers,
+      });
+
+      const eta = new Date(0);
+      eta.setSeconds(dbTorr.status.eta);
+      
+      msgFields.push({
+        name: "ETA",
+        value: eta.toISOString().substr(11, 8),
+      });
+    }
+
+    msg.edit({
+      embed: {
+        title: `🌾 ${request.choice.name}`,
+        fields: msgFields.map((field) => {
+          return {
+            ...field,
+            inline: true,
+          };
+        }),
+        hexColor: COLOR_PRIMARY_HEX,
+      },
+    });
+  }
+
+  async download(requestId, uri) {
+    await this.updateStatusMsg(requestId);
   }
 }
 
@@ -149,11 +242,13 @@ async function main() {
   }
   
   if (checkingDiscordChannel === false) {
-    console.log("Not checking Discord channel recipients");
+    console.log("Warning: Not checking Discord channel recipients");
   }
   
   // Connect to Transmission
   const transmission = new Transmission(cfg.torrent.transmission);
+
+  console.log("Connected to Transmission");
 
   // Connect to MongoDB
   const dbConn = await MongoClient.connect(cfg.mongo.uri, {
@@ -168,15 +263,22 @@ async function main() {
   console.log("Connected to MongoDB");
 
   // Setup discord
-  const discord = new Discord.Client();
-  discord.login(cfg.discord.token);
+  const discord = new Discord.Client({
+    // Partials needed so we can receive events for uncached messages.
+    // From: https://github.com/discordjs/discord.js/issues/4321#issuecomment-650574872
+    partials: ["MESSAGE", "CHANNEL", "REACTION" ],
+  });
 
-    // Setup the resource fetcher
+  // Setup the resource fetcher
   const resourceFetcher = new ResourceFetcher({
     discord: discord,
     db: db,
     transmission: transmission,
   });
+
+  resourceFetcher.runStatusUpdater();
+
+  console.log("Running resource fetch status updater");
 
   // Define bot beavior
   discord.on("ready", async () => {
@@ -212,8 +314,8 @@ async function main() {
         } else {
           desc = "Select option to download:\n\n";
           desc += results.map((item, i) => {
-            return `**${i}** (🌱${item.seeders}, ${item.size})\n_${item.name}_`;
-            }).join("\n\n");
+            return `**#${i}** (🌱${item.seeders}, ${item.size})\n_${item.name}_`;
+          }).join("\n\n");
         }
         
         const listMsg = await msg.reply({
@@ -234,6 +336,7 @@ async function main() {
           await db.requests.insertOne({
             discord: {
               authorId: authorId,
+              channelId: msg.channel.id,
               requestMsgId: msg.id,
               listMsgId: listMsg.id,
             },
@@ -288,6 +391,7 @@ async function main() {
     if (request === null) {
       // They are reacting to something we don't care about, or an old request, or
       // the reactor isn't the author. Ignore and remove.
+      console.log("Ignoring no request");
       return;
     }
 
@@ -306,35 +410,51 @@ async function main() {
     
     const choice = request.results[choiceIndex];
     
-    // Determine status of choice
-    await resourceFetcher.download(request._id, choice.magnetLink);
-
-    const statusMsg = msg.reply({
+    // Send status message
+    const statusMsg = await msg.reply({
       embed: {
         title: `🌾 ${choice.name}`,
         description: "🤔 Verifying...",
         hexColor: COLOR_PRIMARY_HEX,
       },
     });
-    
+
     // Record choice
     await db.requests.updateOne({
       _id: request._id
     }, {
       $set: {
-        ...request,
         choice: choice,
-        discord: {
-          statusMsgId: statusMsg.id,
-        },
+        "discord.statusMsgId": statusMsg.id,
       },
     });
+
+    // Register download
+    await resourceFetcher.download(request._id, choice.magnetLink);
   });
+
+  // Check for reactions on unloaded messages and trigger the appropriate events.
+  //     From: https://stackoverflow.com/a/58960339
+  /*
+  discord.on("raw", packet => {
+    console.log("on raw", package);
+    if (!["MESSAGE_REACTION_ADD", "MESSAGE_REACTION_REMOVE"].includes(packet.t)) return;
+    const channel = discord.channels.get(packet.d.channel_id);
+    if (channel.messages.has(packet.d.message_id)) return;
+    channel.fetchMessage(packet.d.message_id).then(message => {
+      const emoji = packet.d.emoji.id ? `${packet.d.emoji.name}:${packet.d.emoji.id}` : packet.d.emoji.name;
+      const reaction = message.reactions.get(emoji);
+      if (packet.t === "MESSAGE_REACTION_ADD") { discord.emit("messageReactionAdd", reaction, discord.users.get(packet.d.user_id)); }
+      if (packet.t === "MESSAGE_REACTION_REMOVE") { discord.emit("messageReactionRemove", reaction, discord.users.get(packet.d.user_id)); }
+    });
+  });
+  */
+  discord.login(cfg.discord.token);
 }
 
 main()
   .then(() => {
-    console.log("Running");
+    console.log("Discord listening");
   })
   .catch((e) => {
     console.error("Error:", e);
