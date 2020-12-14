@@ -99,6 +99,7 @@ async function main() {
     discord: discord,
     db: db,
     transmission: transmission,
+    log: LOG.child({ component: "resource-fetcher" }),
   });
 
   // Define bot beavior
@@ -155,6 +156,7 @@ async function main() {
           // Record message details in database so we can figure out which item user
           //     is reacting to later.
           await db.requests.insertOne({
+            query: query,
             discord: {
               authorId: authorId,
               channelId: msg.channel.id,
@@ -218,7 +220,7 @@ async function main() {
 
     if (request.discord.authorId !== user.id || request.choice !== null) {
       LOG.info("removed react", request.discord.authorId, user.id, request.choice);
-      return reaction.remove();
+      return reaction.users.remove(user.id);
     }
 
     // Determine which thing they choose
@@ -262,6 +264,6 @@ main()
     LOG.info("Discord listening");
   })
   .catch((e) => {
-    LOG.error("Error:", e);
+    console.error(e);
     process.exit(1);
   });

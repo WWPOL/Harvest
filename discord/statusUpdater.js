@@ -46,12 +46,13 @@ async function main() {
     db: db,
     discord: discord,
     transmission: transmission,
+    log: LOG.child({ component: "resource-fetcher" }),
   });
 
   // Run status updater
   while (true) {
     await resourceFetcher.updateAll();
-    await wait(1000);
+    await wait(10000);
   }
 }
 
@@ -61,6 +62,6 @@ main()
     process.exit(0);
   })
   .catch((e) => {
-    LOG.error("Error running status updater", e);
+    console.error(e);
     process.exit(1);
   });

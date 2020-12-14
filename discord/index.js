@@ -13,13 +13,15 @@ const LOG = makeLogger("index");
 async function run(filename) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(filename);
-    worker.on("error", reject);
+    worker.on("error", (e) => {
+      return reject(`${filename} ${e}`);
+    });
     worker.on("exit", (code) => {
       if (code === 0) {
-        return resolve();
+        return resolve(filename);
       }
 
-      return reject(`Exited with non-zero code: ${code}`);
+      return reject(`${filename} exited with non-zero code: ${code}`);
     });
   });
 }
@@ -37,10 +39,10 @@ async function main() {
 
 main()
   .then(() => {
-    log.info("Done");
+    LOG.info("Done");
     process.exit(0);
   })
   .catch((e) => {
-    log.error("Error", e);
+    console.trace(e);
     process.exit(1);
   });

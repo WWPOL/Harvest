@@ -11,6 +11,18 @@ function setsEq (a, b) {
 }
 
 /**
+ * Round to a number of decimal places.
+ * @param value To round.
+ * @param places Number of decimal places.
+ * @returns Rounded number.
+ */
+function roundTo(value, places) {
+  return parseFloat(value.toString()).toFixed(places);
+  const p = 10^places;
+  return Math.round((value + Number.EPSILON) * p) / p;
+}
+
+/**
  * <pre>
  * Fetches a resource and download it onto the server.
  * The download process of each resource is a state machine implemented by this class. The
@@ -68,19 +80,21 @@ class ResourceFetcher {
   /**
    * Creates a new resource fetcher.
    * @param opts Object which provides objects required to fetch resources. Must have keys
-   *     discord (Discord.Client), transmission (Transmission), db (custom db object).
+   *     discord (Discord.Client), transmission (Transmission), db (custom db object),
+   *     log (Winston logger).
    * @throws {string} If opts is not correctly structured.
    */
   constructor(opts) {
     const haveOpts = new Set(Object.keys(opts));
-    const expectedOpts = new Set(["discord", "transmission", "db"]);
+    const expectedOpts = new Set(["discord", "transmission", "db", "log"]);
     if (setsEq(haveOpts, expectedOpts) === false) {
-      throw `Configuration object must have exactly keys: ${expectedOpts}`;
+      throw `Configuration object must have exactly keys: ${Array.from(expectedOpts).join(", ")}`;
     }
     
     this.discord = opts.discord;
     this.transmission = opts.transmission;
     this.db = opts.db;
+    this.log = opts.log;
   }
 
   /**
@@ -123,13 +137,6 @@ class ResourceFetcher {
   /**
    * Evaluates a resource's state and transitions to other states if needed.
    * Implements the state machine described in the class's documentation comment.
-   *
-   * Updates a resource download request's Discord status message with the current status
-   * of the resource download. If the resource download request is not in a state where
-   * the status message can be updated the function will fail silently. This can happen 
-   * if a status message hasn't been sent yet, or if the requestId is not known.
-   * This function also manages the download process in general. If the download has
-   * not been started this function will start it.
    * @param requestId The ID of the resource request.
    */
   async download(requestId) {
@@ -168,7 +175,13 @@ class ResourceFetcher {
     let torrStatus = ":thinking: Verifying...";
 
     if (status === undefined) {
-      console.warn(`Can't find torrent in Transmission with id ${transmissionId})`);
+      this.log.warn("Can't find torrent for request, will remove request from database", {
+        request_id: request._id,
+        transmission_id: transmissionId,
+        name: request.choice.name,
+        magentUrl: request.choice.magnetUrl,
+      });
+      await this.db.requests.deleteOne({ _id: request._id });
       return;
     }
     
@@ -218,17 +231,17 @@ class ResourceFetcher {
     if (dbTorr.status.status === "Downloading") {
       msgFields.push({
         name: "Progress",
-        value: `${dbTorr.status.progress * 100}%`,
+        value: `${roundTo(dbTorr.status.progress * 100, 2)}%`,
       });
       
       msgFields.push({
         name: "Download Rate",
-        value: dbTorr.status.downloadRate,
+        value: `${roundTo(dbTorr.status.downloadRate / 10000, 2)} MB/s`,
       });
 
       msgFields.push({
         name: "# Peers",
-        value: dbTorr.status.numPeers,
+        value: `${dbTorr.status.numPeers} / ${request.choice.seeders}`,
       });
 
       const eta = new Date(0);
@@ -252,6 +265,12 @@ class ResourceFetcher {
         hexColor: COLORS.PRIMARY_HEX,
       },
     });
+
+    // If newly completed ping user
+    if (request.torrent.status.inProgress === false && dbTorr.status.inProgress === true) {
+      const reqUser = await channel.users.fetch(request.discord.authorId);
+      await channel.send(`${reqUser.toString()} ${request.choice.name} is done.`);
+    }
   }
 }
 
