@@ -2,10 +2,15 @@ require("dotenv").config();
 
 const Transmission = require("transmission");
 
+// Make logger
+const makeLogger = require("./logger");
 const getConfig = require("./config");
 const makeDiscordClient = require("./discord");
 const connectToDB = require("./db");
 const ResourceFetcher = require("./resourceFetcher");
+
+// Make logger
+const LOG = makeLogger("status-updater");
 
 /**
  * Wait asynchronously.
@@ -28,14 +33,14 @@ async function main() {
   const cfg = getConfig();
   
   const db = await connectToDB(cfg);
-  console.log("Connected to MongoDB");
+  LOG.info("Connected to MongoDB");
   
   const discord = makeDiscordClient();
   await discord.login(cfg.discord.token);
-  console.log("Authenticated with Discord API");
+  LOG.info("Authenticated with Discord API");
 
   const transmission = new Transmission(cfg.torrent.transmission);
-  console.log("Connected to Transmission");
+  LOG.info("Connected to Transmission");
 
   const resourceFetcher = new ResourceFetcher({
     db: db,
@@ -52,10 +57,10 @@ async function main() {
 
 main()
   .then(() => {
-    console.log("Status updater done updating");
+    LOG.info("Status updater done updating");
     process.exit(0);
   })
   .catch((e) => {
-    console.error("Error running status updater", e);
+    LOG.error("Error running status updater", e);
     process.exit(1);
   });

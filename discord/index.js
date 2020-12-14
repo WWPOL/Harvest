@@ -1,5 +1,10 @@
 const { Worker } = require("worker_threads");
 
+const makeLogger = require("./logger");
+
+// Make logger
+const LOG = makeLogger("index");
+
 /**
  * Run a worker thread.
  * @params filename The NodeJs Javascript entrypoint
@@ -32,10 +37,10 @@ async function main() {
 
 main()
   .then(() => {
-    console.log("Done");
+    log.info("Done");
     process.exit(0);
   })
   .catch((e) => {
-    console.error("Error", e);
+    log.error("Error", e);
     process.exit(1);
   });

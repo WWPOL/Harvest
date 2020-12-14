@@ -11,6 +11,7 @@ function setsEq (a, b) {
 }
 
 /**
+ * <pre>
  * Fetches a resource and download it onto the server.
  * The download process of each resource is a state machine implemented by this class. The
  * state machine's state for each resource is stored in MongoDB in the `requests` 
@@ -61,12 +62,13 @@ function setsEq (a, b) {
  *   Description: After a resource cannot be downloaded using Transmission
  *   Guaranteed state fields: all from SELECTED + .error
  *   Transitions: none, this state is terminal
+ * </pre>
  */
 class ResourceFetcher {
   /**
    * Creates a new resource fetcher.
    * @param opts Object which provides objects required to fetch resources. Must have keys
-   *     { discord: Discord.Client, transmission: Transmission, db: custom db object }.
+   *     discord (Discord.Client), transmission (Transmission), db (custom db object).
    * @throws {string} If opts is not correctly structured.
    */
   constructor(opts) {

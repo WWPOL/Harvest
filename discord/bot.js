@@ -3,12 +3,17 @@ require("dotenv").config();
 const Transmission = require("transmission");
 const thepiratebay = require("thepiratebay");
 
+const makeLogger = require("./logger");
+
 const getConfig = require("./config");
 const makeDiscordClient = require("./discord");
 const connectToDB = require("./db");
 const ResourceFetcher = require("./resourceFetcher");
 
 const COLORS = require("./colors");
+
+// Make logger
+const LOG = makeLogger("discord-bot");
 
 /**
  * Permissions required by the Discord bot. Encoded for the Discord API using this number.
@@ -75,16 +80,16 @@ async function main() {
   }
   
   if (checkingDiscordChannel === false) {
-    console.log("Warning: Not checking Discord channel recipients");
+    LOG.warn("Not checking Discord channel recipients");
   }
   
   // Connect to Transmission
   const transmission = new Transmission(cfg.torrent.transmission);
-  console.log("Connected to Transmission");
+  LOG.info("Connected to Transmission");
 
   // Connect to MongoDB
-  const db = await connectToDB();
-  console.log("Connected to MongoDB");
+  const db = await connectToDB(cfg);
+  LOG.info("Connected to MongoDB");
 
   // Setup discord
   const discord = makeDiscordClient();
@@ -98,7 +103,7 @@ async function main() {
 
   // Define bot beavior
   discord.on("ready", async () => {
-    console.log(`Logged in as ${discord.user.tag}!`);
+    LOG.info(`Logged in as ${discord.user.tag}!`);
   });
 
   const listMessages = {};
@@ -207,12 +212,12 @@ async function main() {
     if (request === null) {
       // They are reacting to something we don't care about, or an old request, or
       // the reactor isn't the author. Ignore and remove.
-      console.log("Ignoring no request");
+      LOG.info("Ignoring no request");
       return;
     }
 
     if (request.discord.authorId !== user.id || request.choice !== null) {
-      console.log("removed react", request.discord.authorId, user.id, request.choice);
+      LOG.info("removed react", request.discord.authorId, user.id, request.choice);
       return reaction.remove();
     }
 
@@ -254,9 +259,9 @@ async function main() {
 
 main()
   .then(() => {
-    console.log("Discord listening");
+    LOG.info("Discord listening");
   })
   .catch((e) => {
-    console.error("Error:", e);
+    LOG.error("Error:", e);
     process.exit(1);
   });

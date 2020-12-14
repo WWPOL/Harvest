@@ -8,16 +8,19 @@
   "license": "MIT",
   "scripts": {
     "start": "node --unhandled-rejections=strict index.js",
-    "format": "prettier --write \"**/*.{js,jsx,json,md}\""
+    "format": "prettier --write \"**/*.{js,jsx,json,md}\"",
+    "docs": "jsdoc -d docs/ *.js"
   },
   "dependencies": {
     "discord.js": "^12.4.1",
     "dotenv": "^8.2.0",
     "mongodb": "^3.6.3",
     "thepiratebay": "^1.4.8",
-    "transmission": "^0.4.10"
+    "transmission": "^0.4.10",
+    "winston": "^3.3.3"
   },
   "devDependencies": {
+    "jsdoc": "^3.6.6",
     "prettier": "^2.1.2"
   }
 }
