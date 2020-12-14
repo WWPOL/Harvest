@@ -91,5 +91,4 @@ function EnvConfig(prefix, def) {
   return config;
 }
 
-
 module.exports = EnvConfig;
