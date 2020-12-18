@@ -196,6 +196,12 @@ class ResourceFetcher {
     case 6:
       torrStatus = "Seeding";
       break;
+    default:
+      this.log.warn("Encountered unknown resource dowload status", {
+        request_id: request._id,
+        status: status.status,
+      });
+      break;
     }
     
     const dbTorr = {
