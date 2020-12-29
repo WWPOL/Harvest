@@ -1,0 +1,21 @@
+version: "3.7"
+services:
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dev-harvest-mongo
+      MONGO_INITDB_ROOT_PASSWORD: dev-harvest-mongo
+      MONGO_INITDB_DATABASE: dev-harvest
+    ports:
+      - "27017:27017"
+    volumes:
+      - "./container-data/mongo"
+  farmer:
+    build: ./farmer
+    environment:
+      MONGO_URI: mongodb://mongo
+      MONGO_DB: dev-harvest
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./farmer:/opt/harvest/farmer"
